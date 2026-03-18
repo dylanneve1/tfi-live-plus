@@ -309,8 +309,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private var mapLoadJob: Job? = null
+
     fun loadMapStops(south: Double, west: Double, north: Double, east: Double) {
-        viewModelScope.launch {
+        mapLoadJob?.cancel()
+        mapLoadJob = viewModelScope.launch {
+            delay(500) // debounce
             _isLoadingMapStops.value = true
             when (val result = repository.getMapStops(south, west, north, east)) {
                 is ApiResult.Success -> _mapStops.value = result.data

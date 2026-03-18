@@ -35,7 +35,7 @@ fun TripScreen(
     isLoading: Boolean,
     currentStopId: String?,
     onBack: () -> Unit,
-    onStopClicked: (String, String, String) -> Unit // stopRef, stopName, stopType
+    onStopClicked: (String, String, String) -> Unit
 ) {
     val route = departure.serviceNumber
     val destination = departure.destination
@@ -46,7 +46,7 @@ fun TripScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("$route → $destination", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("$route \u2192 $destination", maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -101,7 +101,7 @@ fun TripScreen(
                 }
             }
 
-            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
             when {
                 isLoading -> {
@@ -151,12 +151,11 @@ fun TripScreen(
                     }
                 }
                 else -> {
-                    val rows = tripData.rows!!
+                    val rows = tripData.rows ?: emptyList()
                     val column = tripData.columns?.firstOrNull()
                     val events = column?.events ?: emptyMap()
                     val now = Date()
 
-                    // Find current stop index
                     val currentIdx = remember(rows, events, currentStopId) {
                         var idx = -1
                         rows.forEachIndexed { i, row ->
@@ -230,65 +229,57 @@ private fun TripStopItem(
         else -> accentColor.copy(alpha = 0.4f)
     }
     val textAlpha = if (isPast) 0.5f else 1f
+    val dotSize = if (isCurrent) 14.dp else 10.dp
+    val itemHeight = 56.dp
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(itemHeight)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Timeline column
+        // Timeline column - fixed width
         Box(
             modifier = Modifier
                 .width(32.dp)
-                .height(IntrinsicSize.Max),
-            contentAlignment = Alignment.TopCenter
+                .fillMaxHeight(),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.fillMaxHeight()
-            ) {
-                // Top line
-                if (!isFirst) {
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .height(12.dp)
-                            .background(lineColor)
-                    )
-                } else {
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                // Dot
+            // Top line
+            if (!isFirst) {
                 Box(
                     modifier = Modifier
-                        .size(if (isCurrent) 14.dp else 10.dp)
-                        .clip(CircleShape)
-                        .background(dotColor)
+                        .width(2.5.dp)
+                        .fillMaxHeight(0.5f)
+                        .align(Alignment.TopCenter)
+                        .background(lineColor)
                 )
-
-                // Bottom line
-                if (!isLast) {
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .height(32.dp)
-                            .background(lineColor)
-                    )
-                } else {
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
             }
+            // Bottom line
+            if (!isLast) {
+                Box(
+                    modifier = Modifier
+                        .width(2.5.dp)
+                        .fillMaxHeight(0.5f)
+                        .align(Alignment.BottomCenter)
+                        .background(lineColor)
+                )
+            }
+            // Dot (on top of lines)
+            Box(
+                modifier = Modifier
+                    .size(dotSize)
+                    .clip(CircleShape)
+                    .background(dotColor)
+            )
         }
 
-        // Stop content
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-        ) {
+        Spacer(modifier = Modifier.width(8.dp))
+
+        // Stop name
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 row.stopName ?: "Unknown",
                 style = MaterialTheme.typography.bodyLarge,
@@ -310,13 +301,12 @@ private fun TripStopItem(
         if (event != null) {
             Column(
                 horizontalAlignment = Alignment.End,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(start = 8.dp)
             ) {
                 val scheduled = event.timeOfEvent
                 val realtime = event.realTimeOfEvent
 
                 if (realtime != null && realtime != scheduled) {
-                    // Real-time available
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier

@@ -141,14 +141,18 @@ fun DepartureCard(departure: Departure, onClick: (() -> Unit)? = null) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     departure.operator?.operatorName?.let {
                         Text(
                             it,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
                     if (isLive && delayMins > 1) {
@@ -162,7 +166,9 @@ fun DepartureCard(departure: Departure, onClick: (() -> Unit)? = null) {
                             "${delayMins} min late",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFFE65100),
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }

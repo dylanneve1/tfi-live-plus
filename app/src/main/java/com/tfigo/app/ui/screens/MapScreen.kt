@@ -1,23 +1,18 @@
 package com.tfigo.app.ui.screens
 
-import android.Manifest
-import android.content.pm.PackageManager
+import android.graphics.drawable.GradientDrawable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
 import com.tfigo.app.data.model.Coordinate
 import com.tfigo.app.data.model.LocationResult
 import com.tfigo.app.ui.components.StopTypeIcon
@@ -38,68 +33,114 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     var selectedStop by remember { mutableStateOf<LocationResult?>(null) }
+    val mapViewRef = remember { mutableStateOf<MapView?>(null) }
+    var lastLoadedBounds by remember { mutableStateOf("") }
 
-    // Configure OSMDroid
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
     }
 
+    // Debounced stop loading
+    fun loadStopsIfNeeded(mapView: MapView) {
+        val zoom = mapView.zoomLevelDouble
+        if (zoom < 14.0) return // Only load at reasonable zoom
+
+        val bounds = mapView.boundingBox
+        val key = "%.3f,%.3f,%.3f,%.3f".format(
+            bounds.latSouth, bounds.lonWest, bounds.latNorth, bounds.lonEast
+        )
+        if (key != lastLoadedBounds) {
+            lastLoadedBounds = key
+            onLoadStops(bounds.latSouth, bounds.lonWest, bounds.latNorth, bounds.lonEast)
+        }
+    }
+
+    fun markerColor(type: String): Int = when {
+        type.contains("TRAIN") -> 0xFFC5221F.toInt()
+        type.contains("TRAM") -> 0xFF137333.toInt()
+        type.contains("FERRY") -> 0xFF007B83.toInt()
+        type.contains("COACH") -> 0xFF9334E6.toInt()
+        else -> 0xFF1967D2.toInt()
+    }
+
+    fun createCircleDrawable(color: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(color)
+            setStroke(4, 0xFFFFFFFF.toInt())
+            setSize(36, 36)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // Map view
         AndroidView(
             factory = { ctx ->
                 MapView(ctx).apply {
                     setTileSource(TileSourceFactory.MAPNIK)
                     setMultiTouchControls(true)
-                    controller.setZoom(14.0)
+                    controller.setZoom(15.0)
 
                     val startPoint = if (userLocation != null) {
                         GeoPoint(userLocation.latitude, userLocation.longitude)
                     } else {
-                        GeoPoint(53.3498, -6.2603) // Dublin center
+                        GeoPoint(53.3498, -6.2603)
                     }
                     controller.setCenter(startPoint)
 
-                    // Load stops when map moves
                     addOnFirstLayoutListener { _, _, _, _, _ ->
-                        val bounds = boundingBox
-                        onLoadStops(
-                            bounds.latSouth,
-                            bounds.lonWest,
-                            bounds.latNorth,
-                            bounds.lonEast
-                        )
+                        loadStopsIfNeeded(this)
                     }
 
-                    setOnTouchListener { v, _ ->
-                        v.performClick()
-                        false
-                    }
+                    addMapListener(object : org.osmdroid.events.MapListener {
+                        override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
+                            loadStopsIfNeeded(this@apply)
+                            return false
+                        }
+                        override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
+                            loadStopsIfNeeded(this@apply)
+                            return false
+                        }
+                    })
+
+                    mapViewRef.value = this
                 }
             },
             update = { mapView ->
-                // Update markers when stops change
+                // Only update markers, don't re-add listeners
                 mapView.overlays.removeAll { it is Marker }
 
                 // User location marker
                 if (userLocation != null) {
+                    val userDot = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(0xFF4285F4.toInt())
+                        setStroke(6, 0x664285F4)
+                        setSize(40, 40)
+                    }
                     val userMarker = Marker(mapView).apply {
                         position = GeoPoint(userLocation.latitude, userLocation.longitude)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                         title = "You are here"
-                        icon = context.getDrawable(android.R.drawable.presence_online)
+                        icon = userDot
                     }
                     mapView.overlays.add(userMarker)
                 }
 
-                // Stop markers
-                mapStops.forEach { stop ->
+                // Stop markers - limit to prevent flooding
+                val stopsToShow = if (mapView.zoomLevelDouble < 14.0) {
+                    emptyList()
+                } else {
+                    mapStops.take(150)
+                }
+
+                stopsToShow.forEach { stop ->
                     stop.coordinate?.let { coord ->
                         val marker = Marker(mapView).apply {
                             position = GeoPoint(coord.latitude, coord.longitude)
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                             title = stop.name
                             snippet = formatStopType(stop.type)
+                            icon = createCircleDrawable(markerColor(stop.type))
                             setOnMarkerClickListener { _, _ ->
                                 selectedStop = stop
                                 true
@@ -110,36 +151,13 @@ fun MapScreen(
                 }
 
                 mapView.invalidate()
-
-                // Reload stops on map move
-                mapView.addMapListener(object : org.osmdroid.events.MapListener {
-                    override fun onScroll(event: org.osmdroid.events.ScrollEvent?): Boolean {
-                        val bounds = mapView.boundingBox
-                        onLoadStops(
-                            bounds.latSouth,
-                            bounds.lonWest,
-                            bounds.latNorth,
-                            bounds.lonEast
-                        )
-                        return false
-                    }
-                    override fun onZoom(event: org.osmdroid.events.ZoomEvent?): Boolean {
-                        val bounds = mapView.boundingBox
-                        onLoadStops(
-                            bounds.latSouth,
-                            bounds.lonWest,
-                            bounds.latNorth,
-                            bounds.lonEast
-                        )
-                        return false
-                    }
-                })
             },
             modifier = Modifier.fillMaxSize()
         )
 
         // Loading indicator
         if (isLoadingMapStops) {
+            @Suppress("DEPRECATION")
             LinearProgressIndicator(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -147,29 +165,33 @@ fun MapScreen(
             )
         }
 
-        // Locate me button
-        if (userLocation != null) {
-            FloatingActionButton(
-                onClick = { /* Map will re-center */ },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .padding(bottom = 8.dp),
-                containerColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.MyLocation, contentDescription = "My location")
-            }
+        // Locate me FAB
+        FloatingActionButton(
+            onClick = {
+                val loc = userLocation
+                if (loc != null) {
+                    mapViewRef.value?.controller?.animateTo(
+                        GeoPoint(loc.latitude, loc.longitude), 16.0, 500L
+                    )
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary
+        ) {
+            Icon(Icons.Default.MyLocation, contentDescription = "My location")
         }
 
-        // Bottom sheet for selected stop
+        // Bottom card for selected stop
         selectedStop?.let { stop ->
             Card(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .padding(bottom = 8.dp),
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 80.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
             ) {
                 ListItem(
@@ -186,17 +208,17 @@ fun MapScreen(
                     },
                     leadingContent = { StopTypeIcon(stop.type) },
                     trailingContent = {
-                        FilledTonalButton(onClick = { onStopSelected(stop) }) {
-                            Icon(
-                                Icons.Default.DepartureBoard,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Departures")
+                        FilledTonalButton(onClick = {
+                            selectedStop = null
+                            onStopSelected(stop)
+                        }) {
+                            Text("View")
                         }
                     },
-                    modifier = Modifier.clickable { onStopSelected(stop) }
+                    modifier = Modifier.clickable {
+                        selectedStop = null
+                        onStopSelected(stop)
+                    }
                 )
             }
         }
