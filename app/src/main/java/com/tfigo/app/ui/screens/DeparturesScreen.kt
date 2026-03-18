@@ -1,6 +1,5 @@
 package com.tfigo.app.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,7 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.tfigo.app.data.model.Departure
 import com.tfigo.app.ui.components.DepartureCard
@@ -30,9 +29,11 @@ fun DeparturesScreen(
     isLoading: Boolean,
     isFavourite: Boolean,
     lastUpdated: String,
+    errorMessage: String?,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onToggleFavourite: () -> Unit
+    onToggleFavourite: () -> Unit,
+    onClearError: () -> Unit
 ) {
     var activeFilter by remember { mutableStateOf<String?>(null) }
     val services = remember(departures) {
@@ -42,8 +43,22 @@ fun DeparturesScreen(
         if (activeFilter == null) departures
         else departures.filter { it.serviceNumber == activeFilter }
     }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show error in snackbar
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Short
+            )
+            onClearError()
+        }
+    }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = {
@@ -70,9 +85,11 @@ fun DeparturesScreen(
                             contentDescription = if (isFavourite) "Remove from favourites" else "Add to favourites"
                         )
                     }
-                }
+                },
+                scrollBehavior = scrollBehavior
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onRefresh,
@@ -148,11 +165,18 @@ fun DeparturesScreen(
                                 "No departures",
                                 style = MaterialTheme.typography.titleLarge
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 "No upcoming departures found.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            OutlinedButton(onClick = onRefresh) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Try again")
+                            }
                         }
                     }
                 }
@@ -162,6 +186,16 @@ fun DeparturesScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        if (isLoading) {
+                            item {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                )
+                            }
+                        }
+
                         items(
                             filteredDepartures.take(20),
                             key = { "${it.serviceID}_${it.scheduledDeparture}_${it.destination}" }
@@ -183,7 +217,6 @@ fun DeparturesScreen(
                             }
                         }
 
-                        // Bottom spacer for FAB
                         item { Spacer(modifier = Modifier.height(72.dp)) }
                     }
                 }

@@ -1,23 +1,28 @@
 package com.tfigo.app.data.repository
 
+import com.tfigo.app.data.api.TfiApi
 import com.tfigo.app.data.api.ApiClient
 import com.tfigo.app.data.model.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-class TfiRepository {
+sealed class ApiResult<out T> {
+    data class Success<T>(val data: T) : ApiResult<T>()
+    data class Error(val message: String, val exception: Exception? = null) : ApiResult<Nothing>()
+}
 
-    private val api = ApiClient.api
+class TfiRepository(private val api: TfiApi = ApiClient.api) {
 
-    suspend fun searchStops(query: String): List<LocationResult> {
+    suspend fun searchStops(query: String): ApiResult<List<LocationResult>> {
         return try {
-            api.searchLocations(query)
+            val results = api.searchLocations(query)
+            ApiResult.Success(results)
         } catch (e: Exception) {
-            emptyList()
+            ApiResult.Error("Failed to search: ${e.localizedMessage}", e)
         }
     }
 
-    suspend fun getDepartures(stop: LocationResult): List<Departure> {
+    suspend fun getDepartures(stop: LocationResult): ApiResult<List<Departure>> {
         return try {
             val now = Date()
             val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US)
@@ -33,13 +38,18 @@ class TfiRepository {
                 stopName = stop.name,
                 requestTime = timeStr
             )
-            api.getDepartures(request).stopDepartures ?: emptyList()
+            val response = api.getDepartures(request)
+            if (response.errorMessage != null) {
+                ApiResult.Error(response.errorMessage)
+            } else {
+                ApiResult.Success(response.stopDepartures ?: emptyList())
+            }
         } catch (e: Exception) {
-            emptyList()
+            ApiResult.Error("Failed to load departures: ${e.localizedMessage}", e)
         }
     }
 
-    suspend fun getDeparturesForFavourite(fav: FavouriteStop): List<Departure> {
+    suspend fun getDeparturesForFavourite(fav: FavouriteStop): ApiResult<List<Departure>> {
         val location = LocationResult(
             id = fav.id,
             name = fav.name,

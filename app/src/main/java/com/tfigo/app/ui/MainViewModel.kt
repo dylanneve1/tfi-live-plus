@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tfigo.app.data.model.*
+import com.tfigo.app.data.repository.ApiResult
 import com.tfigo.app.data.repository.FavouritesStore
 import com.tfigo.app.data.repository.TfiRepository
 import kotlinx.coroutines.*
@@ -42,6 +43,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _lastUpdated = MutableStateFlow("")
     val lastUpdated: StateFlow<String> = _lastUpdated
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
+
     // Favourites
     val favourites: StateFlow<List<FavouriteStop>> = favouritesStore.favourites
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -61,9 +65,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         searchJob = viewModelScope.launch {
-            delay(300) // debounce
+            delay(300)
             _isSearching.value = true
-            _searchResults.value = repository.searchStops(query)
+            when (val result = repository.searchStops(query)) {
+                is ApiResult.Success -> _searchResults.value = result.data
+                is ApiResult.Error -> {
+                    _searchResults.value = emptyList()
+                    _errorMessage.value = result.message
+                }
+            }
             _isSearching.value = false
         }
     }
@@ -72,6 +82,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _currentStop.value = stop
         _searchQuery.value = ""
         _searchResults.value = emptyList()
+        _errorMessage.value = null
         loadDepartures(stop)
         checkFavourite(stop.id)
         startAutoRefresh()
@@ -92,11 +103,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _currentStop.value = null
         _departures.value = emptyList()
         _lastUpdated.value = ""
+        _errorMessage.value = null
         stopAutoRefresh()
     }
 
     fun refreshDepartures() {
         _currentStop.value?.let { loadDepartures(it) }
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     fun toggleFavourite() {
@@ -130,10 +146,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadDepartures(stop: LocationResult) {
         viewModelScope.launch {
             _isLoadingDepartures.value = true
-            val result = repository.getDepartures(stop)
-            _departures.value = result
+            _errorMessage.value = null
+            when (val result = repository.getDepartures(stop)) {
+                is ApiResult.Success -> {
+                    _departures.value = result.data
+                    _lastUpdated.value = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+                }
+                is ApiResult.Error -> {
+                    if (_departures.value.isEmpty()) {
+                        _errorMessage.value = result.message
+                    }
+                    // Keep showing old data if we have it
+                }
+            }
             _isLoadingDepartures.value = false
-            _lastUpdated.value = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         }
     }
 

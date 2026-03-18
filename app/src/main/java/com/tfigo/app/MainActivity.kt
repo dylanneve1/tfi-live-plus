@@ -55,6 +55,7 @@ fun TFIGoApp(viewModel: MainViewModel) {
     val isLoadingDepartures by viewModel.isLoadingDepartures.collectAsState()
     val isFavourite by viewModel.isFavourite.collectAsState()
     val lastUpdated by viewModel.lastUpdated.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     val favourites by viewModel.favourites.collectAsState()
 
     AnimatedContent(
@@ -80,9 +81,11 @@ fun TFIGoApp(viewModel: MainViewModel) {
                 isLoading = isLoadingDepartures,
                 isFavourite = isFavourite,
                 lastUpdated = lastUpdated,
+                errorMessage = errorMessage,
                 onBack = { viewModel.goBack() },
                 onRefresh = { viewModel.refreshDepartures() },
-                onToggleFavourite = { viewModel.toggleFavourite() }
+                onToggleFavourite = { viewModel.toggleFavourite() },
+                onClearError = { viewModel.clearError() }
             )
         } else {
             HomeScreen(
