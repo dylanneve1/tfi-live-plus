@@ -15,12 +15,16 @@ import android.webkit.WebViewClient;
 import android.webkit.GeolocationPermissions;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
 public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
+    private int statusBarHeight = 0;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -33,6 +37,22 @@ public class MainActivity extends AppCompatActivity {
 
         webView = new WebView(this);
         setContentView(webView);
+
+        // Listen for window insets to get status bar height
+        ViewCompat.setOnApplyWindowInsetsListener(webView, (v, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            statusBarHeight = insets.top;
+            int navBarHeight = insets.bottom;
+
+            // Inject CSS variable with actual status bar height into the page
+            webView.evaluateJavascript(
+                "document.documentElement.style.setProperty('--status-bar-height', '" + statusBarHeight + "px');" +
+                "document.documentElement.style.setProperty('--nav-bar-height', '" + navBarHeight + "px');",
+                null
+            );
+
+            return WindowInsetsCompat.CONSUMED;
+        });
 
         // Configure WebView
         WebSettings settings = webView.getSettings();
@@ -51,11 +71,19 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                // Keep all navigation within the WebView
-                if (url.startsWith("https://api-lts.transportforireland.ie")) {
-                    return false;
-                }
                 return false;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // Re-inject insets after page load
+                if (statusBarHeight > 0) {
+                    view.evaluateJavascript(
+                        "document.documentElement.style.setProperty('--status-bar-height', '" + statusBarHeight + "px');",
+                        null
+                    );
+                }
             }
         });
 
