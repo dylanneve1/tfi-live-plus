@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -17,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.tfigo.app.data.model.Departure
 import com.tfigo.app.ui.components.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DeparturesScreen(
     stopName: String,
@@ -48,13 +49,11 @@ fun DeparturesScreen(
     }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
+    var toolbarExpanded by remember { mutableStateOf(true) }
 
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
-            snackbarHostState.showSnackbar(
-                message = it,
-                duration = SnackbarDuration.Short
-            )
+            snackbarHostState.showSnackbar(message = it, duration = SnackbarDuration.Short)
             onClearError()
         }
     }
@@ -68,7 +67,7 @@ fun DeparturesScreen(
                         Text(stopName, maxLines = 1)
                         stopCode?.let {
                             Text(
-                                "Stop $it · ${formatStopType(stopType)}",
+                                "Stop $it \u00B7 ${formatStopType(stopType)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -77,7 +76,7 @@ fun DeparturesScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
@@ -93,14 +92,27 @@ fun DeparturesScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onRefresh,
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-            }
-        }
+            HorizontalFloatingToolbar(
+                expanded = toolbarExpanded,
+                floatingActionButton = {
+                    FloatingToolbarDefaults.VibrantFloatingActionButton(
+                        onClick = onRefresh
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                },
+                content = {
+                    if (lastUpdated.isNotEmpty()) {
+                        Text(
+                            "Updated $lastUpdated",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            )
+        },
+        floatingActionButtonPosition = FabPosition.End
     ) { padding ->
         Column(
             modifier = Modifier
@@ -114,10 +126,7 @@ fun DeparturesScreen(
             FacilitiesRow(facilities = facilities)
 
             // Alerts banner
-            AlertsBanner(
-                alerts = alerts,
-                onDismiss = onDismissAlerts
-            )
+            AlertsBanner(alerts = alerts, onDismiss = onDismissAlerts)
 
             // Service filter chips
             if (services.size > 1) {
@@ -128,17 +137,11 @@ fun DeparturesScreen(
                         .padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    FilterChip(
-                        selected = activeFilter == null,
-                        onClick = { activeFilter = null },
-                        label = { Text("All") }
-                    )
+                    FilterChip(selected = activeFilter == null, onClick = { activeFilter = null }, label = { Text("All") })
                     services.forEach { service ->
                         FilterChip(
                             selected = activeFilter == service,
-                            onClick = {
-                                activeFilter = if (activeFilter == service) null else service
-                            },
+                            onClick = { activeFilter = if (activeFilter == service) null else service },
                             label = { Text(service) }
                         )
                     }
@@ -147,44 +150,22 @@ fun DeparturesScreen(
 
             when {
                 isLoading && departures.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator()
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "Loading departures...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text("Loading departures...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
                 filteredDepartures.isEmpty() && !isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Outlined.Schedule,
-                                contentDescription = null,
-                                modifier = Modifier.size(48.dp),
-                                tint = MaterialTheme.colorScheme.outline
-                            )
+                            Icon(Icons.Outlined.Schedule, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                "No departures",
-                                style = MaterialTheme.typography.titleLarge
-                            )
+                            Text("No departures", style = MaterialTheme.typography.titleLarge)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "No upcoming departures found.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Text("No upcoming departures found.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(modifier = Modifier.height(24.dp))
                             OutlinedButton(onClick = onRefresh) {
                                 Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -201,40 +182,12 @@ fun DeparturesScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (isLoading) {
-                            item {
-                                LinearProgressIndicator(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 8.dp)
-                                )
-                            }
+                            item { LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) }
                         }
-
-                        items(
-                            filteredDepartures,
-                            key = { "${it.serviceID}_${it.scheduledDeparture}_${it.destination}" }
-                        ) { departure ->
-                            DepartureCard(
-                                departure = departure,
-                                onClick = { onDepartureClicked(departure) }
-                            )
+                        items(filteredDepartures, key = { "${it.serviceID}_${it.scheduledDeparture}_${it.destination}" }) { departure ->
+                            DepartureCard(departure = departure, onClick = { onDepartureClicked(departure) })
                         }
-
-                        if (lastUpdated.isNotEmpty()) {
-                            item {
-                                Text(
-                                    "Updated $lastUpdated",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 8.dp)
-                                        .wrapContentWidth(Alignment.CenterHorizontally)
-                                )
-                            }
-                        }
-
-                        item { Spacer(modifier = Modifier.height(72.dp)) }
+                        item { Spacer(modifier = Modifier.height(88.dp)) }
                     }
                 }
             }

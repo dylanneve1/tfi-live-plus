@@ -116,18 +116,29 @@ fun TFIGoApp(viewModel: MainViewModel) {
 
     val showBottomNav = currentScreen is MainViewModel.Screen.Home
 
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     Scaffold(
         bottomBar = {
             if (showBottomNav) {
-                NavigationBar {
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                ShortNavigationBar {
+                    ShortNavigationBarItem(
+                        icon = {
+                            Icon(
+                                Icons.Filled.Search,
+                                contentDescription = null
+                            )
+                        },
                         label = { Text("Search") },
                         selected = activeTab == 0,
                         onClick = { viewModel.switchTab(0) }
                     )
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Map, contentDescription = null) },
+                    ShortNavigationBarItem(
+                        icon = {
+                            Icon(
+                                Icons.Filled.Map,
+                                contentDescription = null
+                            )
+                        },
                         label = { Text("Map") },
                         selected = activeTab == 1,
                         onClick = { viewModel.switchTab(1) }

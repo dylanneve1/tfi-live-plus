@@ -286,7 +286,7 @@ fun FacilitiesRow(facilities: List<String>) {
         "TOILETS" to Pair(Icons.Default.Wc, "Toilets"),
         "TICKET_OFFICE" to Pair(Icons.Default.ConfirmationNumber, "Tickets"),
         "CAR_PARK" to Pair(Icons.Default.LocalParking, "Parking"),
-        "WHEELCHAIR_ACCESS" to Pair(Icons.Default.Accessible, "Accessible"),
+        "WHEELCHAIR_ACCESS" to Pair(Icons.Default.WheelchairPickup, "Accessible"),
         "BIKE_PARK" to Pair(Icons.Default.PedalBike, "Bike Park"),
         "WAITING_ROOM" to Pair(Icons.Default.Weekend, "Waiting Room"),
         "WIFI" to Pair(Icons.Default.Wifi, "WiFi"),
