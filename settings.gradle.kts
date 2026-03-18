@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TFI Go"
-include ':app'
+include(":app")

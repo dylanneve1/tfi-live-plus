@@ -1,5 +1,10 @@
-# Default ProGuard rules
+# Retrofit
+-keepattributes Signature
 -keepattributes *Annotation*
--keepclassmembers class * {
-    @android.webkit.JavascriptInterface <methods>;
-}
+-keep class com.tfigo.app.data.model.** { *; }
+-dontwarn retrofit2.**
+-keep class retrofit2.** { *; }
+
+# Gson
+-keepattributes Signature
+-keep class com.google.gson.** { *; }
