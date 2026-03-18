@@ -197,7 +197,7 @@ fun DeparturesScreen(
                         }
 
                         items(
-                            filteredDepartures.take(20),
+                            filteredDepartures,
                             key = { "${it.serviceID}_${it.scheduledDeparture}_${it.destination}" }
                         ) { departure ->
                             DepartureCard(departure = departure)

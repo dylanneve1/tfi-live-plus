@@ -39,15 +39,31 @@ fun HomeScreen(
     onRemoveFavourite: (String) -> Unit
 ) {
     val focusManager = LocalFocusManager.current
+    var searchActive by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    // Sync active state with query
+    LaunchedEffect(searchQuery) {
+        if (searchQuery.isNotEmpty()) searchActive = true
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+    ) {
         // Search bar
         SearchBar(
             query = searchQuery,
             onQueryChange = onSearchQueryChange,
             onSearch = { focusManager.clearFocus() },
-            active = searchQuery.isNotEmpty(),
-            onActiveChange = { if (!it) onSearchQueryChange("") },
+            active = searchActive,
+            onActiveChange = { active ->
+                searchActive = active
+                if (!active) {
+                    onSearchQueryChange("")
+                    focusManager.clearFocus()
+                }
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
@@ -55,7 +71,11 @@ fun HomeScreen(
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { onSearchQueryChange("") }) {
+                    IconButton(onClick = {
+                        onSearchQueryChange("")
+                        searchActive = false
+                        focusManager.clearFocus()
+                    }) {
                         Icon(Icons.Default.Close, contentDescription = "Clear")
                     }
                 }
@@ -102,6 +122,7 @@ fun HomeScreen(
                             modifier = Modifier.clickable {
                                 onStopSelected(result)
                                 onSearchQueryChange("")
+                                searchActive = false
                                 focusManager.clearFocus()
                             }
                         )

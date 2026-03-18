@@ -68,6 +68,12 @@ fun DepartureCard(departure: Departure) {
     val isLive = departure.realTimeDeparture != null
     val mins = timeStr?.let { getMinutesUntil(it) } ?: 0
     val isDue = mins <= 1
+    // Calculate delay (positive = late, negative = early)
+    val delayMins = if (isLive && departure.scheduledDeparture != null) {
+        val rtMins = departure.realTimeDeparture?.let { getMinutesUntil(it) } ?: 0
+        val schedMins = getMinutesUntil(departure.scheduledDeparture)
+        rtMins - schedMins
+    } else 0
 
     Card(
         colors = CardDefaults.cardColors(
@@ -110,14 +116,30 @@ fun DepartureCard(departure: Departure) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                departure.operator?.operatorName?.let {
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    departure.operator?.operatorName?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (isLive && delayMins > 1) {
+                        departure.operator?.operatorName?.let {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("·", style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text(
+                            "${delayMins} min late",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFE65100),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
 
